@@ -1,0 +1,17 @@
+{
+  "name": "NoteFlow",
+  "short_name": "NoteFlow",
+  "description": "A beautiful, themeable PWA notepad with Markdown support.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#24273a",
+  "theme_color": "#c6a0f6",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/2599/2599130.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

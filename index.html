@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+    <meta name="theme-color" content="#060608"/>
+    <title>NoteFlow | Futuristic God-Level</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+    
+    <style>
+        :root {
+            --bg-deep: #020204;
+            --bg-card: #08080a;
+            --bg-nav: #000000;
+            --text-main: #f8f8f2;
+            --text-muted: #808090;
+            --accent: #bb9af7;
+            --accent-glow: rgba(187, 154, 247, 0.5);
+            --border: #1a1a22;
+            --radius-lg: 24px;
+            --font-main: 'Inter', sans-serif;
+            --font-futuristic: 'Orbitron', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-editor: 'Inter', sans-serif;
+            --font-size: 18px;
+        }
+
+        .light-mode {
+            --bg-deep: #f4f4f5;
+            --bg-card: #ffffff;
+            --bg-nav: #ffffff;
+            --text-main: #09090b;
+            --text-muted: #71717a;
+            --accent: #7c3aed;
+            --accent-glow: rgba(124, 58, 237, 0.1);
+            --border: #e4e4e7;
+        }
+
+        /* Ripple Effect */
+        .ripple-circle {
+            position: fixed;
+            width: 2px;
+            height: 2px;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%) scale(0);
+        }
+        .ripple-circle.animate {
+            animation: ripple-grow 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        @keyframes ripple-grow {
+            to { transform: translate(-50%, -50%) scale(4000); }
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-deep);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Futuristic Nav */
+        nav {
+            height: 70px;
+            background: var(--bg-nav);
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            border-bottom: 1px solid var(--border);
+            z-index: 100;
+        }
+        .logo { font-family: var(--font-futuristic); font-weight: 700; font-size: 20px; color: var(--accent); letter-spacing: 2px; text-shadow: 0 0 10px var(--accent-glow); }
+        .nav-right { margin-left: auto; display: flex; align-items: center; gap: 20px; }
+
+        /* Floating Futuristic Container */
+        #app-container {
+            flex: 1;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            background: radial-gradient(circle at center, rgba(187, 154, 247, 0.03) 0%, transparent 70%);
+        }
+
+        #editor-card {
+            width: 100%;
+            max-width: 1300px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            display: flex; flex-direction: column;
+            position: relative;
+            /* Stronger Multi-layered Shadow */
+            box-shadow: 
+                0 0 0 1px rgba(187, 154, 247, 0.1),
+                0 20px 50px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(187, 154, 247, 0.05);
+            animation: pulse-glow 4s infinite alternate, fadeIn 0.8s ease-out;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        @keyframes pulse-glow {
+            from { 
+                box-shadow: 
+                    0 0 0 1px rgba(187, 154, 247, 0.1),
+                    0 20px 50px rgba(0, 0, 0, 0.5),
+                    0 0 20px rgba(187, 154, 247, 0.05); 
+            }
+            to { 
+                box-shadow: 
+                    0 0 0 1px rgba(187, 154, 247, 0.2),
+                    0 25px 60px rgba(0, 0, 0, 0.6),
+                    0 0 35px rgba(187, 154, 247, 0.15); 
+            }
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Toolbar */
+        .toolbar {
+            padding: 15px 25px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.02);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+            overflow-x: auto;
+        }
+        .tool-group { display: flex; align-items: center; gap: 6px; padding: 0 10px; border-right: 1px solid var(--border); }
+        .tool-group:last-child { border-right: none; }
+
+        .btn {
+            background: transparent; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 16px; width: 38px; height: 38px;
+            border-radius: 10px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: visible;
+        }
+        .btn:hover { 
+            color: var(--accent); 
+            background: rgba(187, 154, 247, 0.1); 
+            transform: scale(1.15); 
+            animation: btn-shake 0.4s infinite;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .btn:active, .btn.active-glow { 
+            transform: scale(0.9);
+            box-shadow: 0 0 30px var(--accent), 0 0 60px var(--accent-glow);
+            background: var(--accent-glow);
+            color: var(--accent);
+        }
+
+        /* Explosion Glow Effect on Click */
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 0; height: 0;
+            background: var(--accent);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+        .btn.clicked::after {
+            animation: btn-explode 0.6s ease-out;
+        }
+
+        @keyframes btn-shake {
+            0% { transform: scale(1.15) rotate(0deg); }
+            25% { transform: scale(1.15) rotate(-2deg); }
+            75% { transform: scale(1.15) rotate(2deg); }
+            100% { transform: scale(1.15) rotate(0deg); }
+        }
+
+        @keyframes btn-explode {
+            0% { width: 0; height: 0; opacity: 1; filter: blur(0); }
+            100% { width: 100px; height: 100px; opacity: 0; filter: blur(20px); }
+        }
+
+        /* Mode Indicator */
+        #mode-badge {
+            font-family: var(--font-futuristic); font-size: 10px; padding: 4px 10px;
+            background: rgba(187, 154, 247, 0.1); border: 1px solid var(--accent);
+            border-radius: 20px; color: var(--accent); text-transform: uppercase;
+            margin-left: auto; letter-spacing: 1px;
+        }
+
+        /* Editor Area */
+        #editor-wrapper { flex: 1; display: flex; position: relative; overflow: hidden; }
+        #editor {
+            flex: 1; background: transparent; color: var(--text-main);
+            border: none; outline: none; padding: 60px;
+            font-size: 18px; line-height: 1.8; overflow-y: auto;
+            caret-color: var(--accent);
+        }
+        #editor[data-mode="json"] { font-family: var(--font-mono); color: #78dce8; }
+        #editor[data-mode="md"] { font-family: var(--font-main); }
+
+        /* Markdown Preview Overlay */
+        #md-preview {
+            position: absolute; right: 0; top: 0; bottom: 0; width: 50%;
+            background: var(--bg-card); border-left: 1px solid var(--border);
+            padding: 60px; overflow-y: auto; display: none;
+            z-index: 50;
+        }
+        #md-preview.active { display: block; }
+
+        /* MD Snippets Panel */
+        #md-snippets {
+            position: absolute; left: 0; top: 0; bottom: 0; width: 200px;
+            background: var(--bg-card); border-right: 1px solid var(--border);
+            padding: 20px; display: none; overflow-y: auto; z-index: 50;
+        }
+        #md-snippets.active { display: block; }
+        .snippet-item {
+            padding: 10px; margin-bottom: 8px; border: 1px solid var(--border);
+            border-radius: 8px; font-size: 12px; cursor: pointer; transition: 0.2s;
+            background: rgba(255,255,255,0.02); color: var(--text-muted);
+        }
+        .snippet-item:hover { background: var(--accent-glow); color: var(--accent); border-color: var(--accent); }
+
+        /* Suggestions Box */
+        #suggestions-box {
+            position: fixed; display: none; z-index: 3000;
+            background: var(--bg-nav); border: 1px solid var(--border);
+            border-radius: 10px; min-width: 150px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            backdrop-filter: blur(15px); overflow: hidden;
+        }
+        .suggestion-item {
+            padding: 10px 15px; font-size: 13px; cursor: pointer;
+            color: var(--text-muted); transition: 0.2s;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .suggestion-item:hover, .suggestion-item.active {
+            background: var(--accent-glow); color: var(--accent);
+        }
+        .suggestion-item b { color: var(--accent); }
+
+        /* Custom Circular Color Picker */
+        #color-picker-container {
+            position: fixed; display: none; z-index: 2000;
+            background: var(--bg-nav); border: 1px solid var(--border);
+            border-radius: 50%; width: 200px; height: 200px;
+            padding: 10px; box-shadow: 0 15px 50px rgba(0,0,0,0.9), 0 0 20px var(--accent-glow);
+            backdrop-filter: blur(20px);
+        }
+        .color-circle {
+            width: 100%; height: 100%; border-radius: 50%;
+            background: conic-gradient(from 0deg, red, yellow, lime, aqua, blue, magenta, red);
+            cursor: crosshair; position: relative;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.4);
+        }
+        .color-none {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 48px; height: 48px; background: var(--bg-card); border: 2px solid var(--border);
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+            transition: all 0.3s;
+        }
+        .color-none:hover { transform: translate(-50%, -50%) scale(1.1); border-color: #ff4444; }
+        .color-none::after {
+            content: ''; width: 26px; height: 3px; background: #ff4444; transform: rotate(45deg);
+            border-radius: 2px; box-shadow: 0 0 8px #ff4444;
+        }
+
+        /* Dropdowns */
+        .dropdown { position: relative; }
+        .dropdown-content {
+            position: absolute; top: 100%; right: 0; margin-top: 12px;
+            min-width: 220px; background: var(--bg-nav); border: 1px solid var(--border);
+            border-radius: 14px; box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+            display: none; padding: 8px; z-index: 1000;
+        }
+        .dropdown-content.show { display: block; animation: slideDown 0.2s ease-out; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .dropdown-item {
+            padding: 12px 16px; font-size: 14px; cursor: pointer; border-radius: 10px;
+            display: flex; align-items: center; gap: 12px; color: var(--text-muted); transition: 0.2s;
+        }
+        .dropdown-item:hover { background: rgba(187, 154, 247, 0.1); color: var(--text-main); }
+
+        /* Status Bar */
+        #statusbar {
+            height: 40px; background: var(--bg-nav); border-top: 1px solid var(--border);
+            display: flex; align-items: center; padding: 0 40px; font-size: 12px;
+            color: var(--text-muted); gap: 30px;
+        }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="logo">NOTEFLOW_ULTRA</div>
+        <div class="nav-right">
+            <button class="btn btn-ghost btn-icon" onclick="triggerRippleToggle(event)" title="Toggle Theme">
+                <i class="fa fa-moon" id="theme-icon"></i>
+            </button>
+            <div class="dropdown">
+                <button class="btn" style="width: auto; padding: 0 15px; font-family: var(--font-futuristic); font-size: 12px;" onclick="toggleDropdown('mode-menu')">
+                    <i class="fa fa-terminal"></i> MODE <i class="fa fa-chevron-down" style="font-size: 8px; margin-left: 5px;"></i>
+                </button>
+                <div class="dropdown-content" id="mode-menu">
+                    <div class="dropdown-item" onclick="setMode('txt')"><i class="fa fa-file-alt"></i> Text Document</div>
+                    <div class="dropdown-item" onclick="setMode('json')"><i class="fa fa-code"></i> JSON Data</div>
+                    <div class="dropdown-item" onclick="setMode('md')"><i class="fa fa-markdown"></i> Markdown</div>
+                </div>
+            </div>
+            
+            <div class="dropdown">
+                <button class="btn" style="width: auto; padding: 0 15px; background: var(--accent); color: #000; font-weight: 700;" onclick="toggleDropdown('save-menu')">
+                    SAVE_FILE
+                </button>
+                <div class="dropdown-content" id="save-menu">
+                    <div class="dropdown-item" onclick="exportFile('txt')"><i class="fa fa-file-alt"></i> Export as .txt</div>
+                    <div class="dropdown-item" onclick="exportFile('json')"><i class="fa fa-brackets-curly"></i> Export as .json</div>
+                    <div class="dropdown-item" onclick="exportFile('md')"><i class="fa fa-markdown"></i> Export as .md</div>
+                    <div class="dropdown-item" onclick="exportFile('xlsx')"><i class="fa fa-file-excel"></i> Export Table to XLSX</div>
+                </div>
+            </div>
+
+            <div class="dropdown">
+                <button class="btn btn-ghost" style="width: auto; padding: 0 10px;" onclick="toggleDropdown('settings-menu')">
+                    <i class="fa fa-cog"></i>
+                </button>
+                <div class="dropdown-content" id="settings-menu">
+                    <div class="dropdown-item" style="cursor: default;">
+                        <i class="fa fa-font"></i>
+                        <span>Font Style</span>
+                        <select onchange="changeFont(this.value)" style="background:var(--bg-nav); color:var(--text-main); border:1px solid var(--border); border-radius:4px; margin-left:auto; font-size:12px; padding:2px; cursor:pointer;">
+                            <option value="Inter">Inter</option>
+                            <option value="Orbitron">Orbitron</option>
+                            <option value="JetBrains Mono">Mono</option>
+                            <option value="Montserrat">Montserrat</option>
+                            <option value="Poppins">Poppins</option>
+                        </select>
+                    </div>
+                    <div class="dropdown-item" style="cursor: default;">
+                        <i class="fa fa-text-height"></i>
+                        <span>Font Size</span>
+                        <select onchange="changeFontSize(this.value)" style="background:var(--bg-nav); color:var(--text-main); border:1px solid var(--border); border-radius:4px; margin-left:auto; font-size:12px; padding:2px; cursor:pointer;">
+                            <option value="14px">14px</option>
+                            <option value="18px" selected>18px</option>
+                            <option value="24px">24px</option>
+                            <option value="32px">32px</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div id="app-container">
+        <div id="editor-card">
+            <div class="toolbar">
+                <div class="tool-group">
+                    <button class="btn" onclick="exec('bold')" title="Bold"><i class="fa fa-bold"></i></button>
+                    <button class="btn" onclick="exec('italic')" title="Italic"><i class="fa fa-italic"></i></button>
+                    <button class="btn" onclick="exec('underline')" title="Underline"><i class="fa fa-underline"></i></button>
+                    <button class="btn" onclick="exec('strikethrough')" title="Strikethrough"><i class="fa fa-strikethrough"></i></button>
+                </div>
+                
+                <div class="tool-group">
+                    <button class="btn" onclick="exec('justifyLeft')" title="Align Left"><i class="fa fa-align-left"></i></button>
+                    <button class="btn" onclick="exec('justifyCenter')" title="Align Center"><i class="fa fa-align-center"></i></button>
+                    <button class="btn" onclick="exec('justifyRight')" title="Align Right"><i class="fa fa-align-right"></i></button>
+                </div>
+
+                <div class="tool-group">
+                    <button class="btn" onclick="exec('insertUnorderedList')" title="Bullets"><i class="fa fa-list-ul"></i></button>
+                    <button class="btn" onclick="exec('insertOrderedList')" title="Numbers"><i class="fa fa-list-ol"></i></button>
+                    <button class="btn" onclick="exec('formatBlock', 'blockquote')" title="Quote"><i class="fa fa-quote-left"></i></button>
+                </div>
+
+                <div class="tool-group">
+                    <div class="btn" style="position:relative;" onclick="openColorPicker(event, 'foreColor')" title="Text Color">
+                        <i class="fa fa-font"></i>
+                    </div>
+                    <div class="btn" style="position:relative;" onclick="openColorPicker(event, 'hiliteColor')" title="Highlight Color">
+                        <i class="fa fa-highlighter"></i>
+                    </div>
+                </div>
+
+                <div class="tool-group">
+                    <button class="btn" id="md-snippets-btn" onclick="toggleSnippets()" title="MD Snippets" style="display:none;"><i class="fa fa-shapes"></i></button>
+                    <button class="btn" id="json-format-btn" onclick="prettifyJson()" title="Prettify JSON" style="display:none;"><i class="fa fa-wand-magic-sparkles"></i></button>
+                </div>
+
+                <div class="tool-group">
+                    <div class="dropdown">
+                        <button class="btn" onclick="toggleDropdown('font-family-menu')" title="Font Family">
+                            <i class="fa fa-font"></i>
+                        </button>
+                        <div class="dropdown-content" id="font-family-menu" style="left:0; right:auto;">
+                            <div class="dropdown-item" onclick="changeFont('Inter')">Inter</div>
+                            <div class="dropdown-item" onclick="changeFont('Montserrat')">Montserrat</div>
+                            <div class="dropdown-item" onclick="changeFont('Orbitron')">Orbitron</div>
+                            <div class="dropdown-item" onclick="changeFont('JetBrains Mono')">Monospace</div>
+                            <div class="dropdown-item" onclick="changeFont('Poppins')">Poppins</div>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="adjustFontSize(-2)" title="Decrease Size"><i class="fa fa-minus"></i></button>
+                    <button class="btn" onclick="adjustFontSize(2)" title="Increase Size"><i class="fa fa-plus"></i></button>
+                </div>
+
+                <div id="mode-badge">MODE: TXT</div>
+            </div>
+
+            <div id="editor-wrapper">
+                <div id="md-snippets">
+                    <h4 style="font-family: var(--font-futuristic); font-size: 10px; margin-bottom: 15px; color: var(--accent);">MD_SNIPPETS</h4>
+                    <div class="snippet-item" onclick="insertSnippet('# ')"># H1 Header</div>
+                    <div class="snippet-item" onclick="insertSnippet('## ')">## H2 Header</div>
+                    <div class="snippet-item" onclick="insertSnippet('### ')">### H3 Header</div>
+                    <div class="snippet-item" onclick="insertSnippet('**text**')">**Bold Text**</div>
+                    <div class="snippet-item" onclick="insertSnippet('*text*')">*Italic Text*</div>
+                    <div class="snippet-item" onclick="insertSnippet('> ')">> Blockquote</div>
+                    <div class="snippet-item" onclick="insertSnippet('- ')">- List Item</div>
+                    <div class="snippet-item" onclick="insertSnippet('1. ')">1. Numbered List</div>
+                    <div class="snippet-item" onclick="insertSnippet('```\ncode\n```')">``` Code Block</div>
+                    <div class="snippet-item" onclick="insertSnippet('[link](url)')">[Link](url)</div>
+                    <div class="snippet-item" onclick="insertSnippet('![alt](url)')">![Image](url)</div>
+                    <div class="snippet-item" onclick="insertSnippet('---')">--- Horizontal Rule</div>
+                </div>
+                <div id="editor" contenteditable="true" spellcheck="false" placeholder="INITIALIZING SYSTEM..." data-mode="txt">
+                    <h1>FUTURE_EDITOR_V4</h1>
+                    <p>Welcome to the <b>God-Level</b> futuristic notepad. System status: <span style="color: var(--accent);">OPTIMIZED</span>.</p>
+                </div>
+                <div id="md-preview"></div>
+            </div>
+
+            <div id="statusbar">
+                <span>SYSTEM_READY</span>
+                <span id="word-count">WORDS: 0</span>
+                <span id="char-count">CHARS: 0</span>
+                <div style="flex:1"></div>
+                <span id="time">00:00:00</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="color-picker-container">
+        <div class="color-circle" id="color-circle">
+            <div class="color-none" onclick="applyColor('transparent')" title="Remove Color"></div>
+        </div>
+    </div>
+
+    <div id="suggestions-box"></div>
+
+    <script>
+        const editor = document.getElementById('editor');
+        const suggestBox = document.getElementById('suggestions-box');
+        let currentMode = 'txt';
+        let selectedSuggestIndex = 0;
+        let savedRange = null;
+
+        const jsonKeywords = [
+            "id", "name", "type", "version", "description", "author", "license",
+            "dependencies", "devDependencies", "scripts", "main", "keywords",
+            "repository", "bugs", "homepage", "config", "engines", "os", "cpu",
+            "private", "publishConfig", "workspaces", "properties", "items",
+            "required", "title", "enum", "default", "format", "minimum", "maximum"
+        ];
+
+        function init() {
+            const saved = localStorage.getItem('futuristic_doc');
+            if(saved) editor.innerHTML = saved;
+            
+            const savedMode = localStorage.getItem('futuristic_mode');
+            if(savedMode) setMode(savedMode);
+
+            const savedTheme = localStorage.getItem('futuristic_theme');
+            if(savedTheme === 'light') document.body.classList.add('light-mode');
+            
+            const savedFont = localStorage.getItem('futuristic_font');
+            if(savedFont) editor.style.fontFamily = savedFont;
+
+            const savedFontSize = localStorage.getItem('futuristic_fontsize');
+            if(savedFontSize) editor.style.fontSize = savedFontSize;
+
+            updateStats();
+            setInterval(updateTime, 1000);
+            
+            editor.oninput = (e) => {
+                updateStats();
+                if(currentMode === 'md') updateMdPreview();
+                if(currentMode === 'json') handleJsonIntellisense(e);
+                localStorage.setItem('futuristic_doc', editor.innerHTML);
+            };
+
+            editor.onmouseup = editor.onkeyup = () => {
+                saveSelection();
+            };
+
+            editor.onkeydown = (e) => {
+                if (suggestBox.style.display === 'block') {
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        moveSuggestSelection(1);
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        moveSuggestSelection(-1);
+                    } else if (e.key === 'Enter' || e.key === 'Tab') {
+                        e.preventDefault();
+                        applySuggestion();
+                    } else if (e.key === 'Escape') {
+                        suggestBox.style.display = 'none';
+                    }
+                }
+            };
+        }
+
+        function saveSelection() {
+            const sel = window.getSelection();
+            if (sel.rangeCount > 0) {
+                savedRange = sel.getRangeAt(0);
+            }
+        }
+
+        function restoreSelection() {
+            if (savedRange) {
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(savedRange);
+            }
+        }
+
+        function handleJsonIntellisense(e) {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            const textBefore = range.startContainer.textContent.substring(0, range.startOffset);
+            const lastWord = textBefore.split(/[\s,{}[\].:"]+/).pop();
+
+            if (lastWord.length > 0) {
+                const matches = jsonKeywords.filter(k => k.startsWith(lastWord));
+                if (matches.length > 0) {
+                    showSuggestions(matches, lastWord);
+                } else {
+                    suggestBox.style.display = 'none';
+                }
+            } else {
+                suggestBox.style.display = 'none';
+            }
+        }
+
+        function showSuggestions(matches, query) {
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+
+            suggestBox.innerHTML = matches.map((m, i) => `
+                <div class="suggestion-item ${i === 0 ? 'active' : ''}" onclick="applySuggestion('${m}')">
+                    <i class="fa fa-key" style="font-size:10px;"></i>
+                    <span>${m.replace(query, `<b>${query}</b>`)}</span>
+                </div>
+            `).join('');
+
+            suggestBox.style.display = 'block';
+            suggestBox.style.left = `${rect.left}px`;
+            suggestBox.style.top = `${rect.bottom + 5}px`;
+            selectedSuggestIndex = 0;
+        }
+
+        function moveSuggestSelection(dir) {
+            const items = suggestBox.querySelectorAll('.suggestion-item');
+            items[selectedSuggestIndex].classList.remove('active');
+            selectedSuggestIndex = (selectedSuggestIndex + dir + items.length) % items.length;
+            items[selectedSuggestIndex].classList.add('active');
+            items[selectedSuggestIndex].scrollIntoView({ block: 'nearest' });
+        }
+
+        function applySuggestion(text) {
+            if (!text) {
+                const active = suggestBox.querySelector('.suggestion-item.active');
+                if (active) text = active.innerText.trim();
+                else return;
+            }
+
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            const textNode = range.startContainer;
+            const offset = range.startOffset;
+            const textBefore = textNode.textContent.substring(0, offset);
+            const lastWordMatch = textBefore.match(/[\w]+$/);
+            
+            if (lastWordMatch) {
+                const start = lastWordMatch.index;
+                textNode.textContent = textNode.textContent.substring(0, start) + 
+                                       text + 
+                                       textNode.textContent.substring(offset);
+                
+                // Move cursor to end of inserted word
+                const newRange = document.createRange();
+                newRange.setStart(textNode, start + text.length);
+                newRange.setEnd(textNode, start + text.length);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+            }
+
+            suggestBox.style.display = 'none';
+            localStorage.setItem('futuristic_doc', editor.innerHTML);
+        }
+
+        function triggerRippleToggle(e) {
+            const isLight = document.body.classList.contains('light-mode');
+            const themeIcon = document.getElementById('theme-icon');
+            
+            // Create ripple element
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple-circle';
+            
+            // Position it at click or button center
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX || (rect.left + rect.width / 2);
+            const y = e.clientY || (rect.top + rect.height / 2);
+            
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+            
+            // Color of the ripple (the NEXT theme's background)
+            ripple.style.backgroundColor = isLight ? '#020204' : '#f4f4f5';
+            
+            document.body.appendChild(ripple);
+            
+            // Force reflow
+            ripple.offsetWidth;
+            
+            // Animate
+            ripple.classList.add('animate');
+            
+            // Toggle theme halfway
+            setTimeout(() => {
+                document.body.classList.toggle('light-mode');
+                themeIcon.className = document.body.classList.contains('light-mode') ? 'fa fa-sun' : 'fa fa-moon';
+                localStorage.setItem('futuristic_theme', document.body.classList.contains('light-mode') ? 'light' : 'dark');
+            }, 400);
+
+            // Cleanup
+            setTimeout(() => {
+                ripple.remove();
+            }, 1000);
+        }
+
+        function changeFont(font) {
+            editor.style.fontFamily = font;
+            localStorage.setItem('futuristic_font', font);
+        }
+
+        function changeFontSize(size) {
+            editor.style.fontSize = size;
+            localStorage.setItem('futuristic_fontsize', size);
+        }
+
+        function adjustFontSize(delta) {
+            let current = parseInt(window.getComputedStyle(editor).fontSize);
+            let next = current + delta;
+            if (next < 8) next = 8;
+            if (next > 72) next = 72;
+            changeFontSize(next + 'px');
+        }
+
+        let colorTargetCmd = '';
+
+        function openColorPicker(e, cmd) {
+            saveSelection();
+            colorTargetCmd = cmd;
+            const picker = document.getElementById('color-picker-container');
+            const rect = e.currentTarget.getBoundingClientRect();
+            picker.style.display = 'block';
+            picker.style.left = `${rect.left}px`;
+            picker.style.top = `${rect.bottom + 10}px`;
+            
+            // Auto hide on outside click
+            const hidePicker = (ev) => {
+                if (!ev.target.closest('#color-picker-container') && !ev.target.closest('.btn')) {
+                    picker.style.display = 'none';
+                    document.removeEventListener('mousedown', hidePicker);
+                }
+            };
+            document.addEventListener('mousedown', hidePicker);
+        }
+
+        document.getElementById('color-circle').addEventListener('mousemove', (e) => {
+            if (e.buttons !== 1) return;
+            pickColor(e);
+        });
+        document.getElementById('color-circle').addEventListener('mousedown', pickColor);
+
+        function pickColor(e) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            const canvas = document.createElement('canvas');
+            canvas.width = rect.width; canvas.height = rect.height;
+            const ctx = canvas.getContext('2d');
+            
+            // Align canvas gradient with CSS (CSS conic-gradient starts at top)
+            const gradient = ctx.createConicGradient(-Math.PI/2, rect.width/2, rect.height/2);
+            gradient.addColorStop(0, 'red');
+            gradient.addColorStop(0.17, 'yellow');
+            gradient.addColorStop(0.33, 'lime');
+            gradient.addColorStop(0.5, 'aqua');
+            gradient.addColorStop(0.67, 'blue');
+            gradient.addColorStop(0.83, 'magenta');
+            gradient.addColorStop(1, 'red');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            const pixel = ctx.getImageData(x, y, 1, 1).data;
+            const color = `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+            applyColor(color);
+        }
+
+        function applyColor(color) {
+            restoreSelection();
+            if (color === 'transparent') {
+                if (colorTargetCmd === 'foreColor') {
+                    // Default text: Absolute White on Dark, Absolute Black on Light
+                    exec('foreColor', document.body.classList.contains('light-mode') ? '#000000' : '#ffffff');
+                } else {
+                    exec('hiliteColor', 'transparent');
+                }
+            } else {
+                exec(colorTargetCmd, color);
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            editor.setAttribute('data-mode', mode);
+            document.getElementById('mode-badge').textContent = `MODE: ${mode.toUpperCase()}`;
+            localStorage.setItem('futuristic_mode', mode);
+
+            const preview = document.getElementById('md-preview');
+            const snippets = document.getElementById('md-snippets');
+            const jsonBtn = document.getElementById('json-format-btn');
+            const mdBtn = document.getElementById('md-snippets-btn');
+
+            // Reset
+            preview.classList.remove('active');
+            snippets.classList.remove('active');
+            jsonBtn.style.display = 'none';
+            mdBtn.style.display = 'none';
+
+            if(mode === 'md') {
+                preview.classList.add('active');
+                mdBtn.style.display = 'flex';
+                updateMdPreview();
+            } else if (mode === 'json') {
+                jsonBtn.style.display = 'flex';
+            }
+            
+            document.getElementById('editor-card').style.borderColor = 
+                mode === 'json' ? '#78dce8' : (mode === 'md' ? '#a6da95' : '#1a1a22');
+        }
+
+        function prettifyJson() {
+            try {
+                const obj = JSON.parse(editor.innerText);
+                editor.innerText = JSON.stringify(obj, null, 4);
+                updateStats();
+            } catch (e) {
+                alert("INVALID_JSON_STRUCTURE");
+            }
+        }
+
+        function toggleSnippets() {
+            document.getElementById('md-snippets').classList.toggle('active');
+        }
+
+        function insertSnippet(text) {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(text));
+            editor.focus();
+            updateStats();
+            if(currentMode === 'md') updateMdPreview();
+        }
+
+        function updateMdPreview() {
+            document.getElementById('md-preview').innerHTML = marked.parse(editor.innerText);
+        }
+
+        function exec(cmd, val = null) {
+            document.execCommand(cmd, false, val);
+            editor.focus();
+        }
+
+        function updateStats() {
+            const text = editor.innerText || '';
+            document.getElementById('word-count').textContent = `WORDS: ${text.trim() ? text.trim().split(/\s+/).length : 0}`;
+            document.getElementById('char-count').textContent = `CHARS: ${text.length}`;
+        }
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('time').textContent = now.toLocaleTimeString();
+        }
+
+        function toggleDropdown(id) {
+            const el = document.getElementById(id);
+            const wasShow = el.classList.contains('show');
+            document.querySelectorAll('.dropdown-content').forEach(d => d.classList.remove('show'));
+            if(!wasShow) el.classList.add('show');
+        }
+
+        window.onclick = (e) => {
+            const btn = e.target.closest('.btn');
+            if (btn) {
+                // Explosion effect
+                btn.classList.remove('clicked');
+                void btn.offsetWidth; // Trigger reflow
+                btn.classList.add('clicked');
+                setTimeout(() => btn.classList.remove('clicked'), 600);
+
+                // Toggle active glow for formatting buttons
+                if (btn.hasAttribute('onclick') && btn.getAttribute('onclick').includes('exec')) {
+                    btn.classList.toggle('active-glow');
+                }
+            }
+
+            if (!e.target.closest('.dropdown')) {
+                document.querySelectorAll('.dropdown-content').forEach(d => d.classList.remove('show'));
+            }
+        };
+
+        async function exportFile(ext) {
+            let content = ext === 'json' || ext === 'md' || ext === 'txt' ? editor.innerText : editor.innerHTML;
+            let blob = new Blob([content], {type: 'text/plain'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = `noteflow-${Date.now()}.${ext}`; a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        init();
+    </script>
+</body>
+</html>
